@@ -65,6 +65,11 @@ to decks 1/2, ignoring any mapping file. So for a 4-deck session the app:
    turns jog movement into nudge/search buttons, and sends LED feedback for the active deck back.
 3. renames the FLX4 back to `DDJ-FLX4` when rekordbox quits.
 
+## Docs
+- [Architecture](docs/ARCHITECTURE.md): components, MIDI flow, session lifecycle, testing
+- [MIDI map](docs/MIDI-MAP.md): exactly how every FLX4 message is rewritten
+- [rekordbox notes](docs/REKORDBOX-NOTES.md): rekordbox behaviour this design is based on
+
 ## Build
 ```
 ./build.sh          # app + dmg in dist/

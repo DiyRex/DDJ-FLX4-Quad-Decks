@@ -1,19 +1,29 @@
+import CoreMIDI
 import Foundation
 
-/// Swaps rekordbox's FLX4 user mapping between your normal 2-channel layout and the
-/// generated 4-deck layout. The 2-channel file is backed up byte-for-byte and put back
-/// whenever 4-deck mode ends; rekordbox's bundled default is never touched.
+/// Starts and ends 4-deck mode.
+///
+/// rekordbox recognises the FLX4 by its MIDI name ("DDJ-FLX4") and then runs built-in code
+/// that wires every control straight to decks 1/2, ignoring user mappings. For a 4-deck
+/// session the FLX4's MIDI ports are renamed so rekordbox treats it as an unknown device and
+/// only the router's virtual "FLX4-4DECK" device (with our mapping) drives rekordbox.
+/// Ending the session restores the "DDJ-FLX4" name. The FLX4 mapping file is never touched,
+/// so normal 2-channel use is exactly as before.
 enum Layouts {
+    static let originalName = "DDJ-FLX4"
+    static let sessionName = "FLX4-RAW"
+
     static let fm = FileManager.default
     static let home = fm.homeDirectoryForCurrentUser
-
     static var rbDir: URL { home.appendingPathComponent("Library/Application Support/Pioneer/rekordbox6/MidiMappings") }
-    static var flxFile: URL { rbDir.appendingPathComponent("DDJ-FLX4.midi.csv") }
     static var virtualFile: URL { rbDir.appendingPathComponent("\(MIDIBridge.virtualName).midi.csv") }
-
+    /// Blank mapping rekordbox creates for the renamed FLX4; removed again on restore.
+    static var sessionStubFile: URL { rbDir.appendingPathComponent("\(sessionName).midi.csv") }
     static var stateDir: URL { home.appendingPathComponent("Library/Application Support/FLX4-4Deck") }
-    static var backupFile: URL { stateDir.appendingPathComponent("DDJ-FLX4.2channel-backup.midi.csv") }
-    static var noOriginalFlag: URL { stateDir.appendingPathComponent("no-original-mapping") }
+    /// Kept in our own folder (rekordbox rewrites its mapping files).
+    static var installedFlag: URL { stateDir.appendingPathComponent("4deck-installed") }
+
+    static var is4DeckInstalled: Bool { fm.fileExists(atPath: installedFlag.path) }
 
     static func bundled(_ name: String) -> URL? {
         Bundle.main.url(forResource: name, withExtension: "csv", subdirectory: "mappings")
@@ -21,44 +31,53 @@ enum Layouts {
                 .appendingPathComponent("../../../Resources/mappings/\(name).csv").standardized
     }
 
-    /// rekordbox rewrites mapping files and drops comment rows, so install state is kept
-    /// in our own flag file rather than inside the CSV.
-    static var installedFlag: URL { stateDir.appendingPathComponent("4deck-installed") }
-    static var is4DeckInstalled: Bool { fm.fileExists(atPath: installedFlag.path) }
-
     static func install4Deck() throws {
-        guard let flx = bundled("DDJ-FLX4.4deck.midi"), let virt = bundled("\(MIDIBridge.virtualName).midi"),
-              fm.fileExists(atPath: flx.path), fm.fileExists(atPath: virt.path) else {
-            throw err("4-deck mapping files are missing from the app bundle")
+        guard let virt = bundled("\(MIDIBridge.virtualName).midi"), fm.fileExists(atPath: virt.path) else {
+            throw err("The 4-deck mapping is missing from the app bundle")
+        }
+        guard renameHardware(to: sessionName) else {
+            throw err("DDJ-FLX4 not found. Connect it and try again.")
         }
         try fm.createDirectory(at: rbDir, withIntermediateDirectories: true)
         try fm.createDirectory(at: stateDir, withIntermediateDirectories: true)
-        if !is4DeckInstalled {  // only ever back up a genuine 2-channel file
-            if fm.fileExists(atPath: flxFile.path) {
-                try replace(backupFile, with: flxFile)
-                try? fm.removeItem(at: noOriginalFlag)
-            } else {
-                fm.createFile(atPath: noOriginalFlag.path, contents: nil)
-            }
-        }
-        try replace(flxFile, with: flx)
         try replace(virtualFile, with: virt)
         fm.createFile(atPath: installedFlag.path, contents: nil)
     }
 
+    /// Puts the FLX4 back to normal. Safe to call any time; also repairs a leftover rename.
     static func restore2Channel() throws {
-        if is4DeckInstalled {
-            if fm.fileExists(atPath: backupFile.path) {
-                try replace(flxFile, with: backupFile)
-            } else if fm.fileExists(atPath: noOriginalFlag.path) {
-                try fm.removeItem(at: flxFile)
-            } else {
-                // No backup recorded: fall back to rekordbox's "use default" stub.
-                try "@file,1,DDJ-FLX4\r\n".write(to: flxFile, atomically: true, encoding: .utf8)
+        renameHardware(to: originalName)
+        for f in [virtualFile, sessionStubFile] where fm.fileExists(atPath: f.path) { try fm.removeItem(at: f) }
+        try? fm.removeItem(at: installedFlag)
+    }
+
+    /// True when the FLX4 is connected but still carries the session name (e.g. after a crash).
+    static var hardwareLeftRenamed: Bool { hardwareObjects().contains { MIDIBridge.stringProperty($0, kMIDIPropertyName) == sessionName } }
+
+    /// Renames the FLX4 device, its entity and both endpoints. False if the FLX4 isn't connected.
+    @discardableResult
+    static func renameHardware(to name: String) -> Bool {
+        let objs = hardwareObjects()
+        for o in objs where MIDIBridge.stringProperty(o, kMIDIPropertyName) != name {
+            MIDIObjectSetStringProperty(o, kMIDIPropertyName, name as CFString)
+        }
+        return !objs.isEmpty
+    }
+
+    private static func hardwareObjects() -> [MIDIObjectRef] {
+        var objs: [MIDIObjectRef] = []
+        for i in 0..<MIDIGetNumberOfDevices() {
+            let d = MIDIGetDevice(i)
+            guard MIDIBridge.stringProperty(d, kMIDIPropertyModel) == MIDIBridge.hardwareModel else { continue }
+            objs.append(d)
+            for e in 0..<MIDIDeviceGetNumberOfEntities(d) {
+                let en = MIDIDeviceGetEntity(d, e)
+                objs.append(en)
+                for s in 0..<MIDIEntityGetNumberOfSources(en) { objs.append(MIDIEntityGetSource(en, s)) }
+                for s in 0..<MIDIEntityGetNumberOfDestinations(en) { objs.append(MIDIEntityGetDestination(en, s)) }
             }
         }
-        if fm.fileExists(atPath: virtualFile.path) { try fm.removeItem(at: virtualFile) }
-        try? fm.removeItem(at: installedFlag)
+        return objs
     }
 
     private static func replace(_ dst: URL, with src: URL) throws {

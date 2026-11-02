@@ -76,6 +76,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 show("rekordbox is open in 2-channel mode — quit it, then use Start 4-Deck Session", for: 12)
             }
         } else {
+            if Layouts.is4DeckInstalled || Layouts.hardwareLeftRenamed {
+                Log.write("cleaning up an unfinished session"); try? Layouts.restore2Channel()
+            }
             startSession()
         }
     }
@@ -85,14 +88,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func startSession() {
         if rekordbox != nil {
             if sessionLive { show("4-deck session already running"); return }
-            alert("Quit rekordbox first", "rekordbox reads controller mappings only at launch. Quit rekordbox, then choose Start 4-Deck Session again.")
+            alert("Quit rekordbox first", "rekordbox detects controllers only at launch. Quit rekordbox, then choose Start 4-Deck Session again.")
             return
         }
         do { try Layouts.install4Deck() } catch {
-            alert("Could not install the 4-deck layout", error.localizedDescription); return
+            alert("Could not start 4-deck mode", error.localizedDescription); return
         }
         Session.begin(pid: -1)   // bound to the real pid once rekordbox launches
-        Log.write("4-deck layout installed, launching rekordbox")
+        Log.write("FLX4 renamed for the session, launching rekordbox")
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.rekordboxID) else {
             alert("rekordbox not found", "Install rekordbox, then try again."); restore(); return
         }
@@ -108,9 +111,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func restore() {
         do {
             try Layouts.restore2Channel(); Session.end()
-            Log.write("2-channel layout restored")
-            show(rekordbox != nil ? "2-channel layout restored — takes effect next time rekordbox starts" : "2-channel layout restored", for: 6)
-        } catch { alert("Could not restore the 2-channel layout", error.localizedDescription) }
+            Log.write("FLX4 restored to normal (DDJ-FLX4)")
+            show(rekordbox != nil ? "FLX4 back to normal — restart rekordbox for 2-channel mode" : "FLX4 back to normal", for: 6)
+        } catch { alert("Could not restore the FLX4", error.localizedDescription) }
     }
 
     @objc func appLaunched(_ n: Notification) {
@@ -131,7 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if sessionLive {
             let a = NSAlert()
             a.messageText = "rekordbox is still running in 4-deck mode"
-            a.informativeText = "Quitting stops FLX4 deck control until rekordbox is restarted. The 2-channel layout will be restored for the next rekordbox launch."
+            a.informativeText = "Quitting stops FLX4 control until rekordbox is restarted. The FLX4 goes back to normal 2-channel mode for the next rekordbox launch."
             a.addButton(withTitle: "Quit"); a.addButton(withTitle: "Cancel")
             NSApp.activate(ignoringOtherApps: true)
             if a.runModal() != .alertFirstButtonReturn { return .terminateCancel }
@@ -198,7 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         sz.submenu = sm; menu.addItem(sz)
         menu.addItem(.separator())
         add(menu, sessionLive ? "4-Deck Session Running" : "Start 4-Deck Session (launch rekordbox)", sessionLive ? nil : #selector(startSession))
-        add(menu, "Restore 2-Channel Layout", #selector(restore))
+        add(menu, "Restore FLX4 to 2-Channel Mode", #selector(restore))
         let lm = NSMenuItem(title: "Log MIDI Messages", action: #selector(toggleMIDILog), keyEquivalent: "")
         lm.target = self; lm.state = bridge.verbose ? .on : .off; menu.addItem(lm)
         add(menu, "Open Log", #selector(openLog))

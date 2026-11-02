@@ -21,8 +21,9 @@ enum SelfTest {
         expect(c.input(m(0x91, 0x0B, 0x7F)), [rb(0x91, 0x0B, 0x7F)], "right PLAY -> deck 2")
         expect(c.input(m(0x97, 0x00, 0x7F)), [rb(0x97, 0x00, 0x7F)], "left pad 1 -> deck 1 pads")
         expect(c.input(m(0x96, 0x46, 0x7F)), [rb(0x96, 0x46, 0x7F)], "LOAD left -> deck 1")
-        expect(c.input(m(0x96, 0x41, 0x7F)), [], "browse press stays on FLX4 mapping")
-        expect(c.input(m(0x94, 0x47, 0x7F)), [], "FX unit stays on FLX4 mapping")
+        expect(c.input(m(0xB6, 0x40, 0x01)), [rb(0xB6, 0x40, 0x01)], "browse knob passes through")
+        expect(c.input(m(0xB6, 0x1F, 0x40)), [rb(0xB6, 0x1F, 0x40)], "crossfader passes through")
+        expect(c.input(m(0x94, 0x47, 0x7F)), [rb(0x94, 0x47, 0x7F)], "Beat FX ON passes through")
 
         print("rekordbox feedback before swap")
         expect(c.feedback(m(0x92, 0x0B, 0x7F)), [], "deck 3 PLAY LED is cached, not shown")
@@ -40,7 +41,7 @@ enum SelfTest {
         expect(c.input(m(0x98, 0x00, 0x7F)), [rb(0x9C, 0x00, 0x7F)], "left SHIFT+pad -> deck 3 shift pads")
         expect(c.input(m(0x96, 0x46, 0x7F)), [rb(0x96, 0x48, 0x7F)], "LOAD left -> deck 3")
         expect(c.input(m(0x91, 0x0B, 0x7F)), [rb(0x91, 0x0B, 0x7F)], "right still on deck 2")
-        expect(c.input(m(0xB0, 0x22, 0x41)), [rb(0xB2, 0x22, 0x41)], "left jog -> deck 3")
+        expect(c.input(m(0xB0, 0x22, 0x41)), [rb(0x92, 0x24, 0x7F)], "left jog on stopped deck 3 -> search forward")
         expect(c.feedback(m(0x90, 0x0C, 0x00)), [], "deck 1 LED hidden while left is on deck 3")
         expect(c.feedback(m(0x92, 0x0C, 0x7F)), [fx(0x90, 0x0C, 0x7F)], "deck 3 LED shown on left")
         expect(c.feedback(m(0x9F, 0x06, 0x7F)), [fx(0x9F, 0x04, 0x7F)], "deck 3 loop indicator -> left loop LED")
@@ -53,7 +54,7 @@ enum SelfTest {
         expect(d.input(m(0xB0, 0x13, 30)), [rb(0xB2, 0x13, 30)], "deck 3 fader unknown -> moves immediately")
         _ = d.toggle(0)  // back to deck 1 (value 100), physical fader now at 30
         assert(d.pickup[0][0x13] == 100, "pickup armed")
-        expect(d.input(m(0xB0, 0x13, 50)), [], "fader below deck 1 value is held")
+        expect(d.input(m(0xB0, 0x13, 50)), [], "deck 1 fader held until pickup")
         expect(d.input(m(0xB0, 0x33, 9)), [], "LSB held while picking up")
         expect(d.input(m(0xB0, 0x13, 99)), [rb(0xB0, 0x13, 99)], "fader reaching deck 1 value picks up")
         expect(d.input(m(0xB0, 0x33, 9)), [rb(0xB0, 0x33, 9)], "LSB passes after pickup")
@@ -66,6 +67,43 @@ enum SelfTest {
         expect(f.input(m(0xB6, 0x18, 64)), [rb(0xB6, 0x1A, 64)], "right CFX -> CH4 CFX")
         expect(f.input(m(0xB6, 0x38, 3)), [rb(0xB6, 0x3A, 3)], "right CFX LSB -> CH4")
         expect(f.input(m(0xB6, 0x17, 64)), [rb(0xB6, 0x17, 64)], "left CFX -> CH1")
+
+        print("held buttons release on the deck they were pressed on")
+        let h = RouterCore()
+        expect(h.input(m(0x91, 0x3F, 0x7F)), [rb(0x91, 0x3F, 0x7F)], "SHIFT press on deck 2")
+        _ = h.toggle(1)
+        expect(h.input(m(0x91, 0x3F, 0x00)), [rb(0x91, 0x3F, 0x00)], "SHIFT release still goes to deck 2")
+        expect(h.input(m(0x91, 0x3F, 0x7F)), [rb(0x93, 0x3F, 0x7F)], "next SHIFT press goes to deck 4")
+
+        print("jog: nudge on a playing deck, search otherwise")
+        var now: TimeInterval = 100
+        let j = RouterCore(); j.clock = { now }
+        expect(j.input(m(0xB1, 0x21, 0x43)), [rb(0x91, 0x24, 0x7F)], "stopped deck 2: wheel forward -> search forward")
+        now += 0.2; expect(j.jogIdle(), [rb(0x91, 0x24, 0x00)], "wheel stopped -> release search")
+        _ = j.feedback(m(0x91, 0x0B, 0x7F)); now += 1   // deck 2 play LED steady on = playing
+        _ = j.jogIdle()
+        expect(j.input(m(0xB1, 0x21, 0x43)), [rb(0x91, 0x21, 0x7F)], "playing deck 2: outer edge forward -> nudge up")
+        expect(j.input(m(0xB1, 0x21, 0x42)), [], "more ticks keep holding")
+        now += 0.05; expect(j.jogIdle(), [], "still turning within 80 ms")
+        expect(j.input(m(0xB1, 0x21, 0x3E)), [rb(0x91, 0x21, 0x00), rb(0x91, 0x23, 0x7F)], "reverse -> nudge down")
+        expect(j.input(m(0xB1, 0x22, 0x3E)), [rb(0x91, 0x23, 0x00), rb(0x91, 0x25, 0x7F)], "platter touched -> search back")
+        now += 0.2; _ = j.jogIdle()
+        _ = j.feedback(m(0x91, 0x0B, 0x00)); now += 0.3; _ = j.feedback(m(0x91, 0x0B, 0x7F))  // blinking = paused
+        expect(j.input(m(0xB1, 0x21, 0x43)), [rb(0x91, 0x24, 0x7F)], "blinking play LED (paused) -> search")
+        now += 0.2; _ = j.jogIdle()
+        _ = j.input(m(0xB0, 0x21, 0x41))
+        expect(j.toggle(0).filter { $0.dest == .rekordbox }, [rb(0x90, 0x24, 0x00)], "swap mid-jog releases it on the old deck")
+
+        print("Beat FX channel select: 1/2, SHIFT + 1/2 = 3/4")
+        let x = RouterCore()
+        expect(x.input(m(0x94, 0x10, 0x7F)), [rb(0x94, 0x10, 0x7F)], "CH1 -> FX1 assign CH1")
+        expect(x.input(m(0x94, 0x10, 0x00)), [rb(0x94, 0x10, 0x00)], "release")
+        _ = x.input(m(0x90, 0x3F, 0x7F))  // SHIFT down
+        expect(x.input(m(0x94, 0x10, 0x7F)), [rb(0x94, 0x12, 0x7F)], "SHIFT + CH1 -> FX1 assign CH3")
+        _ = x.input(m(0x90, 0x3F, 0x00))  // SHIFT up before the button
+        expect(x.input(m(0x94, 0x10, 0x00)), [rb(0x94, 0x12, 0x00)], "release still goes to CH3")
+        _ = x.input(m(0x91, 0x3F, 0x7F))
+        expect(x.input(m(0x95, 0x11, 0x7F)), [rb(0x95, 0x13, 0x7F)], "right SHIFT + CH2 on FX2 -> CH4")
 
         print("MASTER CUE swaps both sides")
         let b = RouterCore()

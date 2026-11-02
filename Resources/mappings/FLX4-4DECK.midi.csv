@@ -2,7 +2,13 @@
 #name,function,type,input,deck1,deck2,deck3,deck4,output,deck1,deck2,deck3,deck4,option,comment
 ,,,,,,,,,,,,,,
 # Browser,,,,,,,,,,,,,,
+Browse,Browse,Rotary,B640,,,,,,,,,,,Browse(Track/Folder Select)
+Zoom,Browse+Shift,Rotary,B664,,,,,,,,,,,
+Forward,Browse+Press,Button,9641,,,,,,,,,,,Library Forward (Folder Open)
+Back,Browse+Press+Shift,Button,9642,,,,,,,,,,,Library Back (Folder Close)
 Load,Load,Button,,9646,9647,9648,9649,,,,,,,Load to Deck / Instant Double (double click)
+RelatedTracks,Load1+Shift,Button,9668,,,,,,,,,,,Related Track
+SwitchActiveWindow,Load2+Shift,Button,967A,,,,,,,,,,,BROWSE VIEW
 ,,,,,,,,,,,,,,
 # Deck,,,,,,,,,,,,,,
 PlayPause,PlayPause,Button,900B,0,1,2,3,900B,0,1,2,3,Fast;Priority=50,Play/Pause
@@ -36,6 +42,7 @@ TempoRange,Sync+Shift,Button,9060,0,1,2,3,9060,0,1,2,3,,Tempo Range
 Shift,Shift,Button,903F,0,1,2,3,,,,,,RO,Shift
 ,,,,,,,,,,,,,,
 # Mixer,,,,,,,,,,,,,,
+CrossFader,CrossFader,KnobSliderHiRes,B61F,,,,,,,,,,Fast,Crossfader
 ChannelFader,ChannelFader,KnobSliderHiRes,B013,0,1,2,3,,,,,,,CH Fader
 ChannelFaderStartPlay,ChannelFaderStartPlay,Button,9066,0,1,2,3,,,,,,RO,CH Fader Start (PLAY)
 ChannelFaderStartCue,ChannelFaderStartCue,Button,9052,0,1,2,3,,,,,,RO,CH Fader Start (CUE)
@@ -47,11 +54,36 @@ CFXParameterCH1,CFXParameterCH1,KnobSliderHiRes,B617,,,,,,,,,,Fast,CH1 CFX Depth
 CFXParameterCH3,CFXParameterCH3,KnobSliderHiRes,B619,,,,,,,,,,Fast,CH3 CFX Depth
 CFXParameterCH4,CFXParameterCH4,KnobSliderHiRes,B61A,,,,,,,,,,Fast,CH4 CFX Depth
 CFXParameterCH2,CFXParameterCH2,KnobSliderHiRes,B618,,,,,,,,,,Fast,CH2 CFX Depth
+SmartCFX,SmartCFX,Button,9600,,,,,9600,,,,,,SMART CFX ON/OFF
+SmartCFXSelect,SmartCFXSelect,Button,9608,,,,,,,,,,,SMART CFX Select
+HeadphonesMix,HeadphonesMix,KnobSliderHiRes,B60C,,,,,,,,,,,No function assigned here
+HeadphonesVolume,HeadphonesVolume,KnobSliderHiRes,B60D,,,,,,,,,,,No function assigned here
 HeadphoneCue,HeadphoneCue,Button,9054,0,1,2,3,9054,0,1,2,3,,Headphone CUE On/Off
+SmartFader,SmartFader,Button,9601,,,,,9601,,,,,,SMART FADER ON/OFF
+MasterLevel,MasterLevel,KnobSliderHiRes,B608,,,,,,,,,,,No function assigned here
 ChannelLevel,ChannelLevel,Indicator,,,,,,B002,0,1,2,3,RO;Priority=50,CH Level Indicator
+PanelForward,MasterCue+Shift,Button,9678,,,,,,,,,,,Toggles through panels
 ,,,,,,,,,,,,,,
 # Effect,,,,,,,,,,,,,,
+FX1-1BeatDown,FX1-1BeatDown,Button,944A,,,,,,,,,,,FX1-1 Effect beat down
+FX1AutoBeat,FX1-1BeatDown+Shift,Button,9466,,,,,,,,,,,FX1 Effect auto beat
+FX1-1BeatUp,FX1-1BeatUp,Button,944B,,,,,,,,,,,FX1-1 Effect beat up
+FX1TapBeat,FX1-1BeatUp+Shift,Button,946B,,,,,,,,,,,FX1 Effect tap beat
+FX1-1Select,FX1-1Select.Down,Button,9463,,,,,,,,,,,FX select
+FX1-1SelectBack,FX1-1Select.Up,Button,9464,,,,,,,,,,,FX select
+FX1-1,FX1-1,KnobSliderHiRes,B402,,,,,,,,,,,FX1-1 Effect Depth
+FX1-1On,FX1-1On,Button,9447,,,,,9447,,,,,,FX1-1 Effect On/Off
+FX1ReleaseFXOn,FX1-1On+Shift,Button,9443,,,,,9443,,,,,,FX1 RELEASE FX On
 ,,,,,,,,,,,,,,
+FX2-1BeatDown,FX2-1BeatDown,Button,954A,,,,,,,,,,,FX2-1 Effect beat down
+FX2AutoBeat,FX2-1BeatDown+Shift,Button,9566,,,,,,,,,,,FX2 Effect auto beat
+FX2-1BeatUp,FX2-1BeatUp,Button,954B,,,,,,,,,,,FX2-1 Effect beat up
+FX2TapBeat,FX2-1BeatUp+Shift,Button,956B,,,,,,,,,,,FX2 Effect tap beat
+FX2-1Select,FX2-1Select.Down,Button,9563,,,,,,,,,,,FX select
+FX2-1SelectBack,FX2-1Select.Up,Button,9564,,,,,,,,,,,FX select
+FX2-1,FX2-1,KnobSliderHiRes,B502,,,,,,,,,,,FX2-1 Effect Depth
+FX2-1On,FX2-1On,Button,9547,,,,,9547,,,,,,FX2-1 Effect On/Off
+FX2ReleaseFXOn,FX2-1On+Shift,Button,9543,,,,,9543,,,,,,FX2 RELEASE FX On
 ,,,,,,,,,,,,,,
 ,,,,,,,,,,,,,,
 # Mode,,,,,,,,,,,,,,
@@ -189,7 +221,31 @@ Parameter1Right_KeyShift,PAD8_PadMode8+Shift,Pad,9077,8,10,12,14,9077,8,10,12,14
 LoadedIndicator,LoadedIndicator,Indicator,,,,,,,9F00,9F01,9F02,9F03,RO;Priority=100,Trigger for Load illumination
 GetLoopActive,LoopState,Indicator,,,,,,,9F04,9F05,9F06,9F07,RO;Priority=100,
 Vinyl,Vinyl,Indicator,,,,,,9017,0,1,2,3,RO,Vinyl Mode On/Off (for JOG)
+BackSpinLengthSetting,BackSpinLengthSetting,Indicator,,,,,,BF45,,,,,RO;Priority=100,Back Spin Length Setting
+FaderStartSetting,FaderStartSetting,Indicator,,,,,,9F42,,,,,RO;Priority=100,Fader Start Setting
+CrossFaderReverseSetting,CrossFaderReverseSetting,Indicator,,,,,,9F43,,,,,RO;Priority=100,Cross Fader Reverse Setting
+CrossFaderCutLagSetting,CrossFaderCutLagSetting,Indicator,,,,,,BF41,,,,,RO;Priority=100,Cross Fader Cut Lag Setting
+LevelMeterSetting,LevelMeterSetting,Indicator,,,,,,9F4B,,,,,RO;Priority=100,Switch Level Meter Setting (Channel/Master)
+MicInputSetting,MicInputSetting,Indicator,,,,,,9F4A,,,,,RO;Priority=100,MIC Input Setting
+FaderForSmartFaderSetting,FaderForSmartFaderSetting,Indicator,,,,,,BF4E,,,,,RO;Priority=100,Fader used for SMART FADER Setting
+MasterMonoStereoSetting,MasterMonoStereoSetting,Value,9F47,,,,,9F47,,,,,RO;Priority=100,Mono/Stereo Switch of Master
+MasterPeakLimiterSetting,MasterPeakLimiterSetting,Value,9F49,,,,,9F49,,,,,RO;Priority=100,Master Peak Limiter Setting
 ,,,,,,,,,,,,,,
 # Parameter,,,,,,,,,,,,,,
 JogRatency,JogRatency,Parameter,FFF2,,,,,,,,,,Value=4,unused
 MidiOutInterval,MidiOutInterval,Parameter,FFF3,,,,,,,,,,Value=2,
+# FLX4 4Deck extras,,,,,,,,,,,,,,
+FX1Assign.CH1,,Button,9410,,,,,,,,,,,FX1 assign CH1
+FX1Assign.CH2,,Button,9411,,,,,,,,,,,FX1 assign CH2
+FX1Assign.CH3,,Button,9412,,,,,,,,,,,FX1 assign CH3
+FX1Assign.CH4,,Button,9413,,,,,,,,,,,FX1 assign CH4
+FX1Assign.MASTER,,Button,9414,,,,,,,,,,,FX1 assign MASTER
+FX2Assign.CH1,,Button,9510,,,,,,,,,,,FX2 assign CH1
+FX2Assign.CH2,,Button,9511,,,,,,,,,,,FX2 assign CH2
+FX2Assign.CH3,,Button,9512,,,,,,,,,,,FX2 assign CH3
+FX2Assign.CH4,,Button,9513,,,,,,,,,,,FX2 assign CH4
+FX2Assign.MASTER,,Button,9514,,,,,,,,,,,FX2 assign MASTER
+PitchBendUp,PitchBendUp,Button,9021,0,1,2,3,,,,,,,Jog nudge forward
+PitchBendDown,PitchBendDown,Button,9023,0,1,2,3,,,,,,,Jog nudge back
+SearchFwd,SearchFwd,Button,9024,0,1,2,3,,,,,,,Jog search forward
+SearchRev,SearchRev,Button,9025,0,1,2,3,,,,,,,Jog search back

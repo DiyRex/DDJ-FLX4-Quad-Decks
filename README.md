@@ -2,13 +2,13 @@
 
 Turns a Pioneer DDJ-FLX4 into a simple 4-deck controller for rekordbox 7 (free plan works).
 The left side controls deck 1 or 3, and the right side controls deck 2 or 4. You swap with one button combo.
-An on-screen overlay always shows which deck each side controls.
+An overlay beside the MacBook notch always shows which deck each side controls.
 
-> **Status: early testing.** Routing, LED feedback and layout swapping are tested; channel faders on
-> decks 3/4 are still being verified on hardware.
+> **Status: early testing.** Deck separation, load, browse, Beat FX assign and jog nudge/search are
+> verified in rekordbox; hardware testing is ongoing.
 
-Your normal FLX4 2-channel layout stays the default. The 4-deck layout is only active while
-rekordbox is started through this app. It is put back automatically when rekordbox quits.
+Your normal FLX4 setup is never changed. 4-deck mode exists only while rekordbox is started through
+this app, and the FLX4 is back to normal as soon as rekordbox quits.
 
 ## Install
 1. Open `FLX4-4Deck.dmg` and drag **FLX4 4Deck** to Applications.
@@ -21,45 +21,53 @@ rekordbox is started through this app. It is put back automatically when rekordb
 | 4-deck set | Quit rekordbox → open **FLX4 4Deck** (it launches rekordbox for you) |
 | Normal 2-channel set | Just open rekordbox as usual |
 | Swap a side (1↔3 or 2↔4) | **SHIFT + headphone CUE** on that channel |
-| Swap both sides | **MASTER CUE** (button next to the headphones level) |
+| Swap both sides | **MASTER CUE** |
 | Load a track | **LOAD** on a side loads into that side's *active* deck |
-| Pick a deck with the mouse | Click a deck tile on the overlay, or use the menu bar item (`1\|2`) |
+| Beat FX on deck 1 / 2 | Beat FX channel **1** / **2** |
+| Beat FX on deck 3 / 4 | **SHIFT +** Beat FX channel **1** / **2** |
+| Pick a deck with the mouse | Click a deck in the overlay, or use the menu bar item (`1\|2`) |
 
-Everything on a side follows the active deck: play, cue, jog, tempo, sync, loops, pads, the channel
-fader, trim, EQ and the filter (CFX) knob. The browser, crossfader, FX section and master stay global.
+Everything on a side follows the active deck: play, cue, sync, loops, pads, tempo, the channel
+fader, trim, EQ and the filter (CFX) knob. Browser, crossfader, FX section and master stay global.
 
-**Pickup:** after a swap, a knob or fader whose position doesn't match the new deck is held
-until you move it past the deck's value. The overlay shows it in yellow ("pick up: FADER · TEMPO").
-So swapping never makes the volume or tempo jump.
+**Jog wheels:** rekordbox only accepts jog input from controllers it recognises, so in 4-deck mode
+the jog works as:
+- **outer edge on a playing deck:** nudge (speeds up / slows down while you turn) for beat-matching
+- **touching the top, a stopped deck, or SHIFT + jog:** search (moves the playhead; slow turns move a
+  little, long turns speed up) for cueing
 
-**Overlay:** drag it anywhere. It stays visible over fullscreen rekordbox. Each deck tile shows
-▶ playing / ● loaded and a level meter. Hide or show it from the menu bar item.
+Scratching is not available in 4-deck mode.
 
-What you give up in 4-deck mode: **TAP BPM** (SHIFT + headphone CUE), because that combo is now the swap.
+**Pickup:** after a swap, a knob or fader whose position doesn't match the new deck is held until
+you move it past the deck's value. The overlay shows it in yellow (`⇕ FADER`).
+
+**Overlay:** two small pills either side of the notch (menu bar item → *Overlay Position* →
+*Free* to drag them anywhere, *Overlay Size* for Small / Medium / Large). Each deck shows ▶ playing,
+● loaded and a level meter.
+
+Given up in 4-deck mode: scratching, and **TAP BPM** (its SHIFT + headphone CUE combo is the swap).
 
 ## Troubleshooting
 - **Overlay says "rekordbox is in 2-channel mode":** rekordbox was opened directly. Quit it, then
   choose *Start 4-Deck Session* from the menu bar item.
-- **Something looks stuck:** use *Restore 2-Channel Layout* from the menu. Your original FLX4 mapping
-  file is backed up in `~/Library/Application Support/FLX4-4Deck/`.
-- **Log:** `~/Library/Logs/FLX4-4Deck.log`. To see every MIDI message, run
-  `"/Applications/FLX4 4Deck.app/Contents/MacOS/FLX4Deck" --sniff` in Terminal.
+- **FLX4 not working in normal rekordbox after a crash:** open FLX4 4Deck once (it repairs itself),
+  or use *Restore FLX4 to 2-Channel Mode* from its menu.
+- **Log:** `~/Library/Logs/FLX4-4Deck.log`; menu → *Log MIDI Messages* records every message.
 
 ## How it works
-rekordbox always reads the FLX4 directly, so the app can't simply redirect its messages. Instead:
-1. While a 4-deck session runs, the FLX4 user mapping (`DDJ-FLX4.midi.csv` in
-   `~/Library/Application Support/Pioneer/rekordbox6/MidiMappings/`) is swapped for a version with every
-   deck row disabled. Only the global controls remain.
-2. The app publishes a virtual MIDI device, **FLX4-4DECK**, with a 4-deck mapping. It reads the FLX4,
-   rewrites the deck controls to deck 1–4 MIDI channels, and sends rekordbox's LED feedback for the
-   active deck back to the FLX4.
-3. When rekordbox quits, the original FLX4 mapping file is restored byte-for-byte.
-
-Both mappings are generated from rekordbox's own bundled FLX4 default by `tools/gen_mappings.py`.
+rekordbox recognises the FLX4 by its MIDI name and then runs built-in code that wires every control
+to decks 1/2, ignoring any mapping file. So for a 4-deck session the app:
+1. renames the FLX4's MIDI ports (`DDJ-FLX4` → `FLX4-RAW`), so rekordbox treats it as an unknown
+   device. The hardware unlock is unaffected.
+2. publishes a virtual MIDI device, **FLX4-4DECK**, with a 4-deck mapping
+   (`Resources/mappings/FLX4-4DECK.midi.csv`, generated from rekordbox's own FLX4 default by
+   `tools/gen_mappings.py`). The router reads the FLX4, rewrites deck controls to deck 1–4 channels,
+   turns jog movement into nudge/search buttons, and sends LED feedback for the active deck back.
+3. renames the FLX4 back to `DDJ-FLX4` when rekordbox quits.
 
 ## Build
 ```
 ./build.sh          # app + dmg in dist/
-./build.sh --test   # also runs the CoreMIDI end-to-end test
+./build.sh --test   # also runs the CoreMIDI end-to-end test (quit the app first)
 ```
 Requires the Xcode command line tools. `FLX4Deck --selftest` runs the routing tests.

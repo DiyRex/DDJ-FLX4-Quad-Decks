@@ -5,9 +5,12 @@ import Foundation
 /// device rekordbox maps, and sends LED feedback back to the FLX4.
 final class MIDIBridge {
     static let virtualName = "FLX4-4DECK"
-    // Overridable so the end-to-end test can stand in for the hardware.
-    let hwSourceName = ProcessInfo.processInfo.environment["FLX4_SOURCE"] ?? "DDJ-FLX4"
-    let hwDestName = ProcessInfo.processInfo.environment["FLX4_DEST"] ?? "DDJ-FLX4"
+    static let hardwareModel = "DDJ-FLX4"
+    // Overridable so the end-to-end test can stand in for the hardware. By default the FLX4
+    // is found by its USB model string, which stays put while the app renames its ports.
+    let hwSourceName = ProcessInfo.processInfo.environment["FLX4_SOURCE"]
+    let hwDestName = ProcessInfo.processInfo.environment["FLX4_DEST"]
+    private var jogTimer: DispatchSourceTimer?
 
     let core = RouterCore()
     private let lock = NSLock()
@@ -39,11 +42,18 @@ final class MIDIBridge {
             MIDIObjectSetStringProperty(e, kMIDIPropertyModel, Self.virtualName as CFString)
         }
         connectHardware()
+
+        // Ends a jog nudge shortly after the wheel stops turning.
+        let t = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "jog", qos: .userInteractive))
+        t.schedule(deadline: .now(), repeating: .milliseconds(20))
+        t.setEventHandler { [weak self] in self?.route { $0.jogIdle() } }
+        t.resume()
+        jogTimer = t
     }
 
     /// (Re)attach to the FLX4 endpoints; called at start and whenever MIDI setup changes.
     func connectHardware() {
-        let src = Self.find(hwSourceName, sources: true), dst = Self.find(hwDestName, sources: false)
+        let src = Self.findHardware(hwSourceName, sources: true), dst = Self.findHardware(hwDestName, sources: false)
         if src != hwSource {
             if hwSource != 0 { MIDIPortDisconnectSource(inPort, hwSource) }
             if src != 0 { MIDIPortConnectSource(inPort, src, nil) }
@@ -53,7 +63,7 @@ final class MIDIBridge {
         let now = src != 0 && dst != 0
         if now != hardwareConnected {
             hardwareConnected = now
-            log(now ? "FLX4 connected" : "FLX4 not found (\(hwSourceName))")
+            log(now ? "FLX4 connected (\(Self.displayName(src)))" : "FLX4 not found")
             if now { resendLEDs() }
         }
     }
@@ -136,6 +146,25 @@ final class MIDIBridge {
             emit(MIDIMsg(s: running, d1: p[i], d2: need == 2 ? p[i + 1] : 0))
             i += need
         }
+    }
+
+    /// The FLX4 endpoint: by explicit name when given (tests), else by the device's model.
+    static func findHardware(_ name: String?, sources: Bool) -> MIDIEndpointRef {
+        if let name { return find(name, sources: sources) }
+        let count = sources ? MIDIGetNumberOfSources() : MIDIGetNumberOfDestinations()
+        for i in 0..<count {
+            let e = sources ? MIDIGetSource(i) : MIDIGetDestination(i)
+            var entity = MIDIEntityRef(), device = MIDIDeviceRef()
+            guard MIDIEndpointGetEntity(e, &entity) == noErr, MIDIEntityGetDevice(entity, &device) == noErr else { continue }
+            if stringProperty(device, kMIDIPropertyModel) == hardwareModel { return e }
+        }
+        return 0
+    }
+
+    static func stringProperty(_ o: MIDIObjectRef, _ key: CFString) -> String {
+        var s: Unmanaged<CFString>?
+        MIDIObjectGetStringProperty(o, key, &s)
+        return (s?.takeRetainedValue() as String?) ?? ""
     }
 
     static func find(_ name: String, sources: Bool) -> MIDIEndpointRef {

@@ -1,0 +1,7 @@
+.build/
+dist/
+.swiftpm/
+*.dmg
+.DS_Store
+# Files copied from a local rekordbox install (AlphaTheta's own mappings, personal backups)
+ref/

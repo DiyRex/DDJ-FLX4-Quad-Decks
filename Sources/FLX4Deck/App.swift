@@ -61,6 +61,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu(); menu.delegate = self; statusItem.menu = menu
 
         overlay.onSelectDeck = { [weak self] side, deck in self?.bridge.setDeck(side: side, deck: deck) }
+        // The menu-bar icon can sit hidden under the notch or the pills; the banner opens the same menu.
+        overlay.onBannerClick = { [weak self] in
+            self?.statusItem.menu?.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        }
         overlay.show(UserDefaults.standard.object(forKey: "overlayVisible") as? Bool ?? true)
 
         let ws = NSWorkspace.shared.notificationCenter
@@ -159,6 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.pickup = s.pickup.map { $0.keys.sorted().compactMap { RouterCore.keyNames[$0] } }
         m.status = statusText()
         overlay.model = m
+        overlay.updateHover()
         statusItem.button?.title = "\(s.active[0] + 1)|\(s.active[1] + 1)"
     }
 
@@ -166,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if Date() < noteUntil, let note { return note }
         if !bridge.hardwareConnected { return "DDJ-FLX4 not connected" }
         if rekordbox == nil { return "rekordbox not running" }
-        if !sessionLive { return "rekordbox is in 2-channel mode" }
+        if !sessionLive { return "rekordbox is in 2-channel mode — quit it, then click here: Start 4-Deck Session" }
         return nil
     }
 

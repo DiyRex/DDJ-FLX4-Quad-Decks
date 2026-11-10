@@ -22,8 +22,15 @@ final class OverlayController {
     enum Placement: String { case notch, free }
     static let sizes: [(String, CGFloat)] = [("Small", 0.85), ("Medium", 1.0), ("Large", 1.3)]
 
-    var model = OverlayModel() { didSet { views.forEach { $0.model = model } } }
+    var model = OverlayModel() {
+        didSet {
+            views.forEach { $0.model = model }
+            if model.status != oldValue.status { banner.text = model.status; layout(); updateBanner() }
+        }
+    }
     var onSelectDeck: ((Int, Int) -> Void)?
+    /// Clicking the status banner (e.g. to open the menu-bar menu).
+    var onBannerClick: (() -> Void)? { get { banner.onClick } set { banner.onClick = newValue } }
     private(set) var visible = false
 
     var placement: Placement {
@@ -41,21 +48,14 @@ final class OverlayController {
 
     private let panels: [NSPanel]
     private let views: [SideView]
+    /// Status messages get their own panel below the pills so they never hide the deck chips.
+    private let banner = BannerView()
+    private let bannerPanel: NSPanel
 
     init() {
         views = [SideView(side: 0), SideView(side: 1)]
-        panels = views.map { v in
-            let p = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            p.isFloatingPanel = true
-            p.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)  // above the menu bar
-            p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-            p.backgroundColor = .clear
-            p.isOpaque = false
-            p.hasShadow = false
-            p.hidesOnDeactivate = false
-            p.contentView = v
-            return p
-        }
+        bannerPanel = Self.makePanel(banner)
+        panels = views.map { Self.makePanel($0) }
         for v in views {
             v.controller = self
             v.onSelect = { [weak self] side, deck in self?.onSelectDeck?(side, deck) }
@@ -64,9 +64,38 @@ final class OverlayController {
                                                object: nil, queue: .main) { [weak self] _ in self?.layout() }
     }
 
+    private static func makePanel(_ v: NSView) -> NSPanel {
+        let p = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        p.isFloatingPanel = true
+        p.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)  // above the menu bar
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        p.backgroundColor = .clear
+        p.isOpaque = false
+        p.hasShadow = false
+        p.hidesOnDeactivate = false
+        p.contentView = v
+        return p
+    }
+
     func show(_ on: Bool) {
         visible = on
         if on { layout(); panels.forEach { $0.orderFrontRegardless() } } else { panels.forEach { $0.orderOut(nil) } }
+        updateBanner()
+    }
+
+    private func updateBanner() {
+        if visible && model.status != nil { bannerPanel.orderFrontRegardless() } else { bannerPanel.orderOut(nil) }
+    }
+
+    /// Beside the notch the pills cover menu-bar icons (this app's included). There they let clicks
+    /// through and fade while the pointer is over them, so the icons underneath stay usable.
+    func updateHover() {
+        guard visible else { return }
+        let notch = placement == .notch, mouse = NSEvent.mouseLocation
+        for p in panels {
+            let a: CGFloat = notch && p.frame.contains(mouse) ? 0.12 : 1
+            if p.alphaValue != a { p.alphaValue = a }
+        }
     }
 
     func flash(_ side: Int) { views[side].flash() }
@@ -93,8 +122,19 @@ final class OverlayController {
             frames = [NSRect(x: o.x, y: o.y, width: w, height: h),
                       NSRect(x: o.x + w + gap * 2, y: o.y, width: w, height: h)]
         }
-        for (p, f) in zip(panels, frames) { p.setFrame(f, display: true) }
+        for (p, f) in zip(panels, frames) {
+            p.setFrame(f, display: true)
+            p.ignoresMouseEvents = placement == .notch
+        }
         views.forEach { $0.needsDisplay = true }
+
+        // Banner: centred under the menu bar (notch) or under the pair (free).
+        let bh = round(h * 0.8), bw = min(banner.width(height: bh), s.frame.width - 32)
+        let top = placement == .notch ? s.frame.maxY - max(notchH, s.frame.maxY - s.visibleFrame.maxY) - 6
+                                      : frames[0].minY - 6
+        let cx = placement == .notch ? s.frame.midX : (frames[0].minX + frames[1].maxX) / 2
+        bannerPanel.setFrame(NSRect(x: round(cx - bw / 2), y: top - bh, width: bw, height: bh), display: true)
+        banner.needsDisplay = true
     }
 
     private func defaultFreeOrigin(_ s: NSScreen, w: CGFloat, h: CGFloat) -> NSPoint {
@@ -154,12 +194,6 @@ final class SideView: NSView {
         NSColor.black.withAlphaComponent(0.92).setFill(); pill.fill()
         color.withAlphaComponent(0.35 + 0.65 * glow).setStroke(); pill.lineWidth = 1 + 1.5 * glow; pill.stroke()
 
-        if side == 0, let s = model.status {   // problems take over the left pill
-            label(s, NSRect(x: h * 0.3, y: 0, width: b.width - h * 0.6, height: h), size: h * 0.30,
-                  weight: .semibold, color: .systemYellow, align: .center)
-            return
-        }
-
         let pad = h * 0.16, chipH = h - pad * 2, chipW = h * 1.35
         let tag = side == 0 ? "L" : "R"
         label(tag, NSRect(x: pad, y: 0, width: h * 0.45, height: h), size: h * 0.34, weight: .heavy,
@@ -205,5 +239,32 @@ final class SideView: NSView {
         let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color, .paragraphStyle: ps]
         let th = font.ascender - font.descender
         (s as NSString).draw(in: NSRect(x: r.minX, y: r.midY - th / 2, width: r.width, height: th), withAttributes: attrs)
+    }
+}
+
+/// One-line status message (yellow) in its own pill; a click calls `onClick`.
+final class BannerView: NSView {
+    var text: String? { didSet { needsDisplay = true } }
+    var onClick: (() -> Void)?
+
+    override var isFlipped: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseUp(with e: NSEvent) { onClick?() }
+
+    private func attrs(_ h: CGFloat) -> [NSAttributedString.Key: Any] {
+        [.font: NSFont.systemFont(ofSize: h * 0.42, weight: .semibold), .foregroundColor: NSColor.systemYellow]
+    }
+
+    func width(height h: CGFloat) -> CGFloat {
+        ceil(((text ?? "") as NSString).size(withAttributes: attrs(h)).width + h * 1.2)
+    }
+
+    override func draw(_ dirty: NSRect) {
+        let b = bounds, h = b.height
+        let pill = NSBezierPath(roundedRect: b.insetBy(dx: 0.5, dy: 0.5), xRadius: h / 2, yRadius: h / 2)
+        NSColor.black.withAlphaComponent(0.92).setFill(); pill.fill()
+        NSColor.systemYellow.withAlphaComponent(0.5).setStroke(); pill.lineWidth = 1; pill.stroke()
+        let a = attrs(h), s = (text ?? "") as NSString, size = s.size(withAttributes: a)
+        s.draw(at: NSPoint(x: (b.width - size.width) / 2, y: (h - size.height) / 2), withAttributes: a)
     }
 }
